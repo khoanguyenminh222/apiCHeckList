@@ -210,13 +210,15 @@ async function exportToExcel(fromDate, toDate) {
             { header: 'Nhân viên kiểm tra', key: 'fullname', width: 20 },
             { header: 'Tài khoản nhân viên', key: 'username', width: 20 },
             { header: 'Tên khách hàng', key: 'customerName', width: 20 },
-            { header: 'Huyện', key: 'district', width: 15 },
+            { header: 'Địa chỉ', key: 'address', width: 40 },
             { header: 'Sđt', key: 'phoneNumber', width: 15 },
-            { header: 'Địa chỉ', key: 'address', width: 30 },
             { header: 'tài khoản VNPT', key: 'vnptAccount', width: 20 },
             { header: 'Ngày gặp KH', key: 'date', width: 15 },
-            { header: 'Các mục kiểm tra', key: 'checklist', width: 60 },
+            { header: 'Các mục kiểm tra', key: 'checklist', width: 80 },
+            { header: 'Nhà Mạng', key: 'networks', width: 15 },
+            { header: 'Thời gian đóng tiền', key: 'paymentTime', width: 20 },
             { header: 'Ghi chú', key: 'note', width: 30 },
+            { header: 'Ảnh', key: 'image', width: 20 },
             { header: 'Ngày tạo', key: 'createAt', width: 15 }
         ];
 
@@ -225,20 +227,40 @@ async function exportToExcel(fromDate, toDate) {
             date: { $gte: fromDate, $lte: toDate }
         }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
 
+        const result = [];
+        for (const submission of listSubmits) {
+            const quan = await Quan.findOne({ idQuan: submission.idQuan });
+            const phuong = await Phuong.findOne({ idPhuong: submission.idPhuong });
+            const pho = await Pho.findOne({ idPho: submission.idPho });
+
+            // Tạo một đối tượng mới chứa thông tin từ ListSubmit và các bảng liên quan
+            const mergedSubmission = {
+                ...submission.toObject(),
+                quan: quan.toObject(),
+                phuong: phuong.toObject(),
+                pho: pho.toObject()
+            };
+
+            // Thêm đối tượng này vào mảng kết quả
+            result.push(mergedSubmission);
+        }
+
         // Thêm dữ liệu vào file Excel
-        listSubmits.forEach(submit => {
+        result.forEach(submit => {
             const checkedItems = submit.checkedItems.map(item => item.name).join('\n');
             worksheet.addRow({
                 fullname: submit.userId.fullname,
                 username: submit.userId.username,
                 customerName: submit.customerName,
-                district: submit.district,
+                address: submit.address+", "+submit.pho.tenPho+", "+submit.phuong.tenPhuong+", "+submit.quan.tenQuan,
                 phoneNumber: submit.phoneNumber,
-                address: submit.address,
                 vnptAccount: submit.vnptAccount,
                 date: submit.date.toLocaleDateString(),
                 checklist: checkedItems,
+                networks: submit.networks,
+                paymentTime: submit.paymentTime,
                 note: submit.note,
+                image: submit.image ? { hyperlink: `${process.env.domain}${submit.image}`, text: 'View Image' } : '',
                 createAt: submit.createdAt.toLocaleDateString()
             });
         });
