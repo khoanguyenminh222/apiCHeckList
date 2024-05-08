@@ -6,6 +6,7 @@ const User = require('../models/User');
 const fs = require('fs-extra');
 const path = require('path');
 const multer = require('multer');
+const moment = require('moment-timezone');
 const CheckList = require('../models/CheckList');
 const { Quan, Phuong, Pho } = require('../models/Address'); 
 require('dotenv/config')
@@ -222,9 +223,13 @@ async function exportToExcel(fromDate, toDate) {
             { header: 'Ngày tạo', key: 'createAt', width: 15 }
         ];
 
+        // Chuyển đổi fromDate và toDate sang múi giờ UTC+7
+        const utcFromDate = moment.utc(fromDate).add(7, 'hours').toDate();
+        const utcToDate = moment.utc(toDate).add(7, 'hours').toDate();
+
         // Lấy dữ liệu từ cơ sở dữ liệu MongoDB trong khoảng thời gian từ fromDate đến toDate
         const listSubmits = await ListSubmit.find({
-            date: { $gte: fromDate, $lte: toDate }
+            date: { $gte: utcFromDate, $lte: utcToDate }
         }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
 
         const result = [];
@@ -248,6 +253,8 @@ async function exportToExcel(fromDate, toDate) {
         // Thêm dữ liệu vào file Excel
         result.forEach(submit => {
             const checkedItems = submit.checkedItems.map(item => item.name).join('\n');
+            const utcDate = moment.utc(submit.date).add(7, 'hours').toDate();
+            const utcCreatedAt = moment.utc(submit.createdAt).add(7, 'hours').toDate();
             worksheet.addRow({
                 fullname: submit.userId.fullname,
                 username: submit.userId.username,
@@ -255,19 +262,19 @@ async function exportToExcel(fromDate, toDate) {
                 address: submit.address+", "+submit.pho.tenPho+", "+submit.phuong.tenPhuong+", "+submit.quan.tenQuan,
                 phoneNumber: submit.phoneNumber,
                 vnptAccount: submit.vnptAccount,
-                date: submit.date.toLocaleDateString(),
+                date: utcDate.toLocaleDateString(),
                 checklist: checkedItems,
                 networks: submit.networks,
                 paymentTime: submit.paymentTime,
                 note: submit.note,
                 image: submit.image ? { hyperlink: `${process.env.domain}${submit.image}`, text: 'View Image' } : '',
-                createAt: submit.createdAt.toLocaleDateString()
+                createAt: utcCreatedAt.toLocaleDateString()
             });
         });
 
         // Lưu file Excel vào thư mục tạm trên máy chủ
-        const startDate = fromDate.toLocaleDateString().replace(/\//g, '-'); // Chuyển ngày bắt đầu thành chuỗi và thay thế dấu /
-        const endDate = toDate.toLocaleDateString().replace(/\//g, '-'); // Chuyển ngày kết thúc thành chuỗi và thay thế dấu /
+        const startDate = utcFromDate.toLocaleDateString().replace(/\//g, '-'); // Chuyển ngày bắt đầu thành chuỗi và thay thế dấu /
+        const endDate = utcToDate.toLocaleDateString().replace(/\//g, '-'); // Chuyển ngày kết thúc thành chuỗi và thay thế dấu /
         const fileName = `list_submit_${startDate}_to_${endDate}.xlsx`;
         const tempDir = 'temp';
         const tempFilePath = path.join(tempDir, fileName);
