@@ -25,7 +25,7 @@ const upload = multer({ storage: storage });
 // Route để tạo mới một ChecklistSubmission
 router.post('/', upload.single('image'), async (req, res) => {
     try {
-        let { customerName, idQuan, idPhuong, idPho, phoneNumber, address, vnptAccount, checkedItems, networks, paymentTime, date, note, userId, location } = req.body;
+        let { customerName, idQuan, idPhuong, idPho, phoneNumber, address, vnptAccount, checkedItems, networks, paymentTime, date, dateExpired, note, userId, location } = req.body;
         console.log(req.file)
         // Kiểm tra xem file có tồn tại trong req.file không
         let imageUrl = '';
@@ -46,6 +46,7 @@ router.post('/', upload.single('image'), async (req, res) => {
             networks,
             paymentTime,
             date,
+            dateExpired,
             note,
             userId,
             location,
@@ -143,6 +144,16 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/getAll', async (req,res) => {
+    try {
+        const checklistSubmissions = await ListSubmit.find().sort({ createdAt: -1 });
+        res.json(checklistSubmissions);
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: error.message });
+    }
+})
+
 // Route để lấy một ChecklistSubmission theo ID
 router.get('/:id', getChecklistSubmission, (req, res) => {
     res.json(res.checklistSubmission);
@@ -211,15 +222,19 @@ async function exportToExcel(fromDate, toDate) {
             { header: 'Nhân viên kiểm tra', key: 'fullname', width: 20 },
             { header: 'Tài khoản nhân viên', key: 'username', width: 20 },
             { header: 'Tên khách hàng', key: 'customerName', width: 20 },
-            { header: 'Địa chỉ', key: 'address', width: 40 },
+            { header: 'Địa chỉ', key: 'address', width: 15 },
+            { header: 'Phố', key: 'pho', width: 15 },
+            { header: 'Phường', key: 'phuong', width: 15 },
+            { header: 'Quận', key: 'quan', width: 15 },
             { header: 'Sđt', key: 'phoneNumber', width: 15 },
             { header: 'tài khoản VNPT', key: 'vnptAccount', width: 20 },
             { header: 'Ngày gặp KH', key: 'date', width: 15 },
             { header: 'Các mục kiểm tra', key: 'checklist', width: 80 },
             { header: 'Nhà Mạng', key: 'networks', width: 15 },
-            { header: 'Thời gian đóng tiền', key: 'paymentTime', width: 20 },
+            { header: 'Thời gian đã đóng tiền', key: 'paymentTime', width: 20 },
             { header: 'Ghi chú', key: 'note', width: 30 },
             { header: 'Ảnh', key: 'image', width: 20 },
+            { header: 'Ngày hết hạn', key: 'dateExpired', width: 15 },
             { header: 'Ngày tạo', key: 'createAt', width: 15 }
         ];
 
@@ -259,7 +274,10 @@ async function exportToExcel(fromDate, toDate) {
                 fullname: submit.userId.fullname,
                 username: submit.userId.username,
                 customerName: submit.customerName,
-                address: submit.address+", "+submit.pho.tenPho+", "+submit.phuong.tenPhuong+", "+submit.quan.tenQuan,
+                address: submit.address,
+                pho: submit.pho.tenPho,
+                phuong: submit.phuong.tenPhuong,
+                quan: submit.quan.tenQuan,
                 phoneNumber: submit.phoneNumber,
                 vnptAccount: submit.vnptAccount,
                 date: utcDate.toLocaleDateString(),

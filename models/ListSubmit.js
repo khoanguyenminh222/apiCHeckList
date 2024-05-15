@@ -45,6 +45,10 @@ const listSubmitSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
+    dateExpired: { 
+        type: Date,
+        required: true
+    },
     note: {
         type: String,
         default: ''

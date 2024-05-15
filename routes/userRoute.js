@@ -5,6 +5,7 @@ const multer = require('multer');
 const exceljs = require('exceljs');
 
 const User = require('../models/User');
+const { Quan, Phuong, Pho } = require('../models/Address'); 
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -216,6 +217,31 @@ router.get('/all', async (req, res) => {
     } catch (error) {
         console.error('Lỗi khi lấy tất cả người dùng:', error);
         res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng thử lại sau' });
+    }
+});
+
+router.put('/:userId/codeDistrict', async (req, res) => {
+    try {
+        let userId = req.params.userId;
+        let codeDistrictArray = req.body.codeDistrictArray; // Mảng các đối tượng { idQuan, idPhuong }
+
+        // Tìm người dùng trong cơ sở dữ liệu
+        let user = await User.findById(userId);
+        
+        // Kiểm tra nếu không tìm thấy người dùng
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+        console.log(codeDistrictArray)
+        // Cập nhật codeDistrict của người dùng
+        user.codeDistrict = codeDistrictArray;
+        await user.save();
+
+        // Trả về thông báo thành công
+        return res.status(200).json({ message: 'codeDistrict cập nhật thành công' });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng thử lại sau' });
     }
 });
 
