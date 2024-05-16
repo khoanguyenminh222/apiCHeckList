@@ -232,9 +232,19 @@ router.put('/:userId/codeDistrict', async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: 'Người dùng không tồn tại' });
         }
+
+        // Kiểm tra nếu codeDistrictArray chứa null
+        const hasNull = codeDistrictArray.some(item => item.idQuan === null && item.idPhuong === null);
         console.log(codeDistrictArray)
-        // Cập nhật codeDistrict của người dùng
-        user.codeDistrict = codeDistrictArray;
+        console.log(codeDistrictArray.some(item => item == null))
+        if (hasNull) {
+            // Xóa codeDistrict của người dùng
+            user.codeDistrict = [];
+        } else {
+            // Cập nhật codeDistrict của người dùng
+            user.codeDistrict = codeDistrictArray;
+        }
+        
         await user.save();
 
         // Trả về thông báo thành công

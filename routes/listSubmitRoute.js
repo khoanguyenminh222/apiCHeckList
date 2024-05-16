@@ -63,7 +63,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     }
 });
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 // Route để lấy tất cả ChecklistSubmissions query: page, role, search
 router.get('/', async (req, res) => {
     try {
@@ -76,36 +76,15 @@ router.get('/', async (req, res) => {
         let queryOptions = {};
         //nếu là user
         if (role === 'user' && userId) {
-            const checklists = await CheckList.find({
-                name: { $regex: search, $options: 'i' },
-            });
-            const checklistIds = checklists.map(checklist => checklist._id);
             queryOptions = {
                 userId: userId, // Chỉ lọc theo userId của người dùng
-                $or: [
-                    { checkedItems: { $in: checklistIds } }
-                ]
+                customerName: { $regex: search, $options: 'i' } // Tìm theo customerName nếu là user
             };
         } else { // nếu là admin
-            // Tìm kiếm User với username hoặc fullname phù hợp
-            const users = await User.find({
-                $or: [
-                    { username: { $regex: search, $options: 'i' } },
-                    { fullname: { $regex: search, $options: 'i' } }
-                ]
-            });
-            // Lấy danh sách các _id của User tìm được
-            const userIds = users.map(user => user._id);
-
-            //tìm kiếm theo name của checkedItems nếu có
-            const checklists = await CheckList.find({
-                name: { $regex: search, $options: 'i' } 
-            });
-            const checklistIds = checklists.map(checklist => checklist._id);
-            queryOptions.$or = [
-                { userId: { $in: userIds } },
-                { checkedItems: { $in: checklistIds } }
-            ];
+            // Tìm kiếm theo tên khách hàng trong listSubmit
+            queryOptions = {
+                customerName: { $regex: search, $options: 'i' } // Tìm theo customerName nếu là admin
+            };
         }
 
         // ListSubmit với userId thuộc danh sách userIds
@@ -145,9 +124,17 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/getAll', async (req,res) => {
+    const {role, userId} = req.query
+    console.log(req.query)
     try {
-        const checklistSubmissions = await ListSubmit.find().sort({ createdAt: -1 });
-        res.json(checklistSubmissions);
+        if(role === 'user' && userId){
+            const checklistSubmissions = await ListSubmit.find({userId:userId}).populate('userId').populate('checkedItems').sort({ dateExpired: 1 });
+            res.json(checklistSubmissions);
+        }else{
+            const checklistSubmissions = await ListSubmit.find().populate('userId').populate('checkedItems').sort({ dateExpired: 1 });
+            res.json(checklistSubmissions);
+        }
+        
     } catch (error) {
         console.log(error)
         res.status(500).json({ message: error.message });
@@ -186,7 +173,7 @@ router.delete('/:id', getChecklistSubmission, async (req, res) => {
 const baseUrl = process.env.domain;
 router.post('/export', async (req, res) => {
     try {
-        const { fromDate, endDate } = req.body;
+        const { fromDate, endDate, selectedQuan, selectedPhuong, userId, role } = req.body;
 
         // Kiểm tra xem fromDate và endDate có tồn tại và hợp lệ không
         if (!fromDate || !endDate) {
@@ -201,7 +188,7 @@ router.post('/export', async (req, res) => {
         fromDateObj.setHours(0, 0, 0, 0);
         endDateObj.setHours(23, 59, 59, 999);
 
-        const filePath = await exportToExcel(fromDateObj, endDateObj);
+        const filePath = await exportToExcel(fromDateObj, endDateObj, selectedQuan, selectedPhuong, userId, role);
         const fileUrl = `${baseUrl}/${filePath.replace(/\\/g, '/')}`; // Thay thế dấu gạch chéo ngược bằng dấu gạch chéo
         console.log(fileUrl)
         // Trả về URL của tệp Excel cho client
@@ -212,7 +199,7 @@ router.post('/export', async (req, res) => {
 })
 
 // Hàm này sẽ xuất dữ liệu vào file Excel
-async function exportToExcel(fromDate, toDate) {
+async function exportToExcel(fromDate, toDate, selectedQuan, selectedPhuong, userId, role) {
     try {
         const workbook = new exceljs.Workbook();
         const worksheet = workbook.addWorksheet('List Submit');
@@ -228,7 +215,6 @@ async function exportToExcel(fromDate, toDate) {
             { header: 'Quận', key: 'quan', width: 15 },
             { header: 'Sđt', key: 'phoneNumber', width: 15 },
             { header: 'tài khoản VNPT', key: 'vnptAccount', width: 20 },
-            { header: 'Ngày gặp KH', key: 'date', width: 15 },
             { header: 'Các mục kiểm tra', key: 'checklist', width: 80 },
             { header: 'Nhà Mạng', key: 'networks', width: 15 },
             { header: 'Thời gian đã đóng tiền', key: 'paymentTime', width: 20 },
@@ -243,10 +229,47 @@ async function exportToExcel(fromDate, toDate) {
         const utcToDate = moment.utc(toDate).add(7, 'hours').toDate();
 
         // Lấy dữ liệu từ cơ sở dữ liệu MongoDB trong khoảng thời gian từ fromDate đến toDate
-        const listSubmits = await ListSubmit.find({
-            date: { $gte: utcFromDate, $lte: utcToDate }
-        }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
-
+        let listSubmits =[]
+        // nếu là user thì chỉ tìm của user đó
+        if(userId && role==="user"){
+            if(selectedQuan && selectedPhuong==null){
+                listSubmits = await ListSubmit.find({
+                    userId: userId,
+                    idQuan: selectedQuan,
+                    date: { $gte: utcFromDate, $lte: utcToDate }
+                }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
+            }else if(selectedQuan==null && selectedPhuong==null){
+                listSubmits = await ListSubmit.find({
+                    userId: userId,
+                    date: { $gte: utcFromDate, $lte: utcToDate }
+                }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
+            }else{
+                listSubmits = await ListSubmit.find({
+                    userId: userId,
+                    idQuan: selectedQuan,
+                    idPhuong: selectedPhuong,
+                    date: { $gte: utcFromDate, $lte: utcToDate }
+                }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
+            }
+        }else{
+            if(selectedQuan && selectedPhuong==null){
+                listSubmits = await ListSubmit.find({
+                    idQuan: selectedQuan,
+                    date: { $gte: utcFromDate, $lte: utcToDate }
+                }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
+            }else if(selectedQuan==null && selectedPhuong==null){
+                listSubmits = await ListSubmit.find({
+                    date: { $gte: utcFromDate, $lte: utcToDate }
+                }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
+            }else{
+                listSubmits = await ListSubmit.find({
+                    idQuan: selectedQuan,
+                    idPhuong: selectedPhuong,
+                    date: { $gte: utcFromDate, $lte: utcToDate }
+                }).populate('userId').populate('checkedItems').sort({ createdAt: -1 });
+            }
+        }
+        
         const result = [];
         for (const submission of listSubmits) {
             const quan = await Quan.findOne({ idQuan: submission.idQuan });
@@ -268,7 +291,7 @@ async function exportToExcel(fromDate, toDate) {
         // Thêm dữ liệu vào file Excel
         result.forEach(submit => {
             const checkedItems = submit.checkedItems.map(item => item.name).join('\n');
-            const utcDate = moment.utc(submit.date).add(7, 'hours').toDate();
+            const utcDate = moment.utc(submit.dateExpired).add(7, 'hours').toDate();
             const utcCreatedAt = moment.utc(submit.createdAt).add(7, 'hours').toDate();
             worksheet.addRow({
                 fullname: submit.userId.fullname,
@@ -280,12 +303,12 @@ async function exportToExcel(fromDate, toDate) {
                 quan: submit.quan.tenQuan,
                 phoneNumber: submit.phoneNumber,
                 vnptAccount: submit.vnptAccount,
-                date: utcDate.toLocaleDateString(),
                 checklist: checkedItems,
                 networks: submit.networks,
                 paymentTime: submit.paymentTime,
                 note: submit.note,
                 image: submit.image ? { hyperlink: `${process.env.domain}${submit.image}`, text: 'View Image' } : '',
+                dateExpired: utcDate.toLocaleDateString(),
                 createAt: utcCreatedAt.toLocaleDateString()
             });
         });
