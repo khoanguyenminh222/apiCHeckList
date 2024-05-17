@@ -80,7 +80,7 @@ router.get('/', async (req, res) => {
                 userId: userId, // Chỉ lọc theo userId của người dùng
                 customerName: { $regex: search, $options: 'i' } // Tìm theo customerName nếu là user
             };
-        } else { // nếu là admin
+        } else if(role === 'admin' || role==='manager'){ // nếu là admin
             // Tìm kiếm theo tên khách hàng trong listSubmit
             queryOptions = {
                 customerName: { $regex: search, $options: 'i' } // Tìm theo customerName nếu là admin
