@@ -67,6 +67,11 @@ const listSubmitSchema = new mongoose.Schema({
     image: {
         type: String, // Lưu trữ hình ảnh dưới dạng Buffer
         default: ''
+    },
+    process: {
+        type: Number,
+        default: 0, // Giá trị mặc định: chưa xử lý
+        enum: [0, 1]
     }
 },{ timestamps: true }
 );

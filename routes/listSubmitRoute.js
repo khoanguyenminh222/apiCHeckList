@@ -161,6 +161,16 @@ async function getChecklistSubmission(req, res, next) {
     next();
 }
 
+router.put('/:id', getChecklistSubmission, async (req, res) => {
+    try {
+        res.checklistSubmission.process = req.body.process;
+        const updatedListSubmission = await res.checklistSubmission.save();
+        res.status(201).json(updatedListSubmission);
+    } catch (error) {
+        res.status(400).json({ message: err.message });
+    }
+})
+
 // Route để xóa một ChecklistSubmission theo ID
 router.delete('/:id', getChecklistSubmission, async (req, res) => {
     try {
@@ -220,6 +230,7 @@ async function exportToExcel(fromDate, toDate, selectedQuan, selectedPhuong, use
             { header: 'Thời gian đã đóng tiền', key: 'paymentTime', width: 20 },
             { header: 'Ghi chú', key: 'note', width: 30 },
             { header: 'Ảnh', key: 'image', width: 20 },
+            { header: 'Tiến độ', key: 'process', width: 15 },
             { header: 'Ngày hết hạn', key: 'dateExpired', width: 15 },
             { header: 'Ngày tạo', key: 'createAt', width: 15 }
         ];
@@ -308,6 +319,7 @@ async function exportToExcel(fromDate, toDate, selectedQuan, selectedPhuong, use
                 paymentTime: submit.paymentTime,
                 note: submit.note,
                 image: submit.image ? { hyperlink: `${process.env.domain}${submit.image}`, text: 'View Image' } : '',
+                process: submit.process==1 ? 'Đã xử lý' : 'Chưa xử lý',
                 dateExpired: utcDate.toLocaleDateString(),
                 createAt: utcCreatedAt.toLocaleDateString()
             });
