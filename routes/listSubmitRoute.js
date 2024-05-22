@@ -141,6 +141,17 @@ router.get('/getAll', async (req,res) => {
     }
 })
 
+// dùng để hiển thị trên map customer
+router.get('/getAllCustomer', async (req,res) => {
+    try {
+        const checklistSubmissions = await ListSubmit.find().populate('userId').populate('checkedItems').sort({ dateExpired: 1 });
+        res.json(checklistSubmissions);
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: error.message });
+    }
+})
+
 // Route để lấy một ChecklistSubmission theo ID
 router.get('/:id', getChecklistSubmission, (req, res) => {
     res.json(res.checklistSubmission);
